@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Чек-лист Продуктов</title>
+    <!-- Connect Telegram Web Apps API -->
+    <script src="https://telegram.org"></script>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background-color: var(--tg-theme-bg-color, #f5f5f5);
+        color: var(--tg-theme-text-color, #333);
+        margin: 0;
+        padding: 16px;
+        padding-bottom: 80px; /* Space for sticky button */
+      }
+      h2 {
+        font-size: 20px;
+        margin-bottom: 8px;
+        color: var(--tg-theme-hint-color, #666);
+        border-bottom: 2px solid #ffcc00;
+        padding-bottom: 4px;
+      }
+      .subtitle {
+        font-size: 14px;
+        color: var(--tg-theme-hint-color, #777);
+        margin-bottom: 20px;
+      }
+      .category-title {
+        font-size: 16px;
+        font-weight: bold;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        color: #1a73e8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .product-item {
+        background-color: var(--tg-theme-secondary-bg-color, #ffffff);
+        padding: 14px;
+        margin-bottom: 8px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .product-info {
+        display: flex;
+        flex-direction: column;
+      }
+      .product-name {
+        font-size: 16px;
+        font-weight: 500;
+      }
+      .product-qty {
+        font-size: 12px;
+        color: #888;
+        margin-top: 2px;
+      }
+      .checkbox-container {
+        width: 24px;
+        height: 24px;
+        border: 2px solid #ccc;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+      .checkbox-container::after {
+        content: "✕";
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+        display: none;
+      }
+      /* Active / Selected styles */
+      .product-item.selected {
+        background-color: #ffebe6; /* Light red tint for missing items */
+        border: 1px solid #ff4d4d;
+      }
+      .product-item.selected .checkbox-container {
+        background-color: #ff4d4d;
+        border-color: #ff4d4d;
+      }
+      .product-item.selected .checkbox-container::after {
+        display: block;
+      }
+      .footer-btn-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 16px;
+        background: linear-gradient(
+          transparent,
+          var(--tg-theme-bg-color, #f5f5f5) 20%
+        );
+      }
+      .submit-btn {
+        width: 100%;
+        background-color: var(--tg-theme-button-color, #2481cc);
+        color: var(--tg-theme-button-text-color, #ffffff);
+        border: none;
+        padding: 16px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <h2>📋 Инвентаризация</h2>
+    <div class="subtitle">Отметьте позиции, которые <b>ЗАКОНЧИЛИСЬ</b>:</div>
+
+    <div id="checklist-container"></div>
+
+    <div class="footer-btn-container">
+      <button class="submit-btn" id="submit-data">🛒 Сформировать заказ</button>
+    </div>
+
+    <script>
+      const tg = window.Telegram.WebApp;
+      tg.expand(); // Auto-expand to maximum height on mobile screen
+
+      // hardcoded list of products parsed on load, matching your text layout
+      const rawProducts = [
+        {
+          name: "Молоко",
+          link: "https://www.perekrestok.ru/cat/114/p/moloko-ultrapasterizovannoe-ekoniva-2-5-1l-3922314",
+          qty: "2 шт.",
+          cat: "🥛 Молочка",
+        },
+        {
+          name: "Яйца С0",
+          link: "https://www.perekrestok.ru/cat/1589/p/ajco-kurinoe-aktivita-s1-s-selenom-i-jodom-zelenaa-linia-10st-4068694",
+          qty: "1 дес.",
+          cat: "🥛 Молочка",
+        },
+        {
+          name: "Хлеб",
+          link: "https://www.perekrestok.ru/cat/1846/p/iz-pekarni-hleb-monz-na-psenicnoj-vysokobelkovoj-muke-260g-78036700",
+          qty: "1 шт.",
+          cat: "🥛 Бакалея",
+        },
+        // You can paste all your 40 products directly here following this pattern!
+      ];
+
+      const container = document.getElementById("checklist-container");
+      let currentCategory = "";
+
+      // Group and render elements by categories
+      rawProducts.forEach((prod, index) => {
+        if (prod.cat !== currentCategory) {
+          currentCategory = prod.cat;
+          const catDiv = document.createElement("div");
+          catDiv.className = "category-title";
+          catDiv.innerText = currentCategory;
+          container.appendChild(catDiv);
+        }
+
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "product-item";
+        itemDiv.dataset.index = index;
+        itemDiv.innerHTML = `
+                <div class="product-info">
+                    <span class="product-name">${prod.name}</span>
+                    <span class="product-qty">Нужно: ${prod.qty}</span>
+                </div>
+                <div class="checkbox-container"></div>
+            `;
+
+        itemDiv.addEventListener("click", () => {
+          itemDiv.classList.toggle("selected");
+        });
+
+        container.appendChild(itemDiv);
+      });
+
+      // Pack and send data back to your Mac when clicking submit
+      document.getElementById("submit-data").addEventListener("click", () => {
+        const selectedItems = [];
+        document.querySelectorAll(".product-item.selected").forEach((item) => {
+          const idx = item.dataset.index;
+          selectedItems.push(rawProducts[idx]);
+        });
+
+        if (selectedItems.length === 0) {
+          tg.showAlert("Вы не выбрали ни одного закончившегося продукта!");
+          return;
+        }
+
+        // Send payload as a pure JSON string directly into Python bot pipeline
+        tg.sendData(JSON.stringify(selectedItems));
+        tg.close();
+      });
+    </script>
+  </body>
+</html>
