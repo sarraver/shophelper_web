@@ -131,11 +131,10 @@
     </div>
 
     <script>
-      // Инициализация Telegram WebApp
       const tg = window.Telegram.WebApp;
       tg.expand();
 
-      // ИСПРАВЛЕННЫЙ СПИСОК ПРОДУКТОВ БЕЗ СИНТАКСИЧЕСКИХ ОШИБОК
+      // ВАШ СПИСОК ПРОДУКТОВ (Можете дописать сюда остальные 40 позиций по такому же шаблону)
       const rawProducts = [
         {
           name: "Молоко",
@@ -158,55 +157,53 @@
       ];
 
       const container = document.getElementById("checklist-container");
+      let currentCat = "";
 
-      try {
-        // Группировка продуктов по категориям
-        const categories = {};
-        rawProducts.forEach((prod) => {
-          if (!categories[prod.cat]) {
-            categories[prod.cat] = [];
-          }
-          categories[prod.cat].push(prod);
+      rawProducts.forEach((prod, index) => {
+        if (prod.cat !== currentCat) {
+          currentCat = prod.cat;
+          const catDiv = document.createElement("div");
+          catDiv.className = "category-title";
+          catDiv.textContent = currentCat;
+          container.appendChild(catDiv);
+        }
+
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "product-item";
+        itemDiv.dataset.idx = index;
+
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "product-info";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "product-name";
+        nameSpan.textContent = prod.name;
+
+        const qtySpan = document.createElement("span");
+        qtySpan.className = "product-qty";
+        qtySpan.textContent = "Нужно: " + prod.qty;
+
+        infoDiv.appendChild(nameSpan);
+        infoDiv.appendChild(qtySpan);
+
+        const checkDiv = document.createElement("div");
+        checkDiv.className = "checkbox-container";
+
+        itemDiv.appendChild(infoDiv);
+        itemDiv.appendChild(checkDiv);
+
+        itemDiv.addEventListener("click", () => {
+          itemDiv.classList.toggle("selected");
         });
 
-        // Отрисовка элементов на экране
-        Object.keys(categories).forEach((catName) => {
-          const catHeader = document.createElement("div");
-          catHeader.className = "category-title";
-          catHeader.innerText = catName;
-          container.appendChild(catHeader);
+        container.appendChild(itemDiv);
+      });
 
-          categories[catName].forEach((prod) => {
-            const itemDiv = document.createElement("div");
-            itemDiv.className = "product-item";
-            itemDiv.dataset.product = JSON.stringify(prod);
-            itemDiv.innerHTML = `
-                        <div class="product-info">
-                            <span class="product-name">${prod.name}</span>
-                            <span class="product-qty">Нужно: ${prod.qty}</span>
-                        </div>
-                        <div class="checkbox-container"></div>
-                    `;
-
-            itemDiv.addEventListener("click", () => {
-              itemDiv.classList.toggle("selected");
-            });
-
-            container.appendChild(itemDiv);
-          });
-        });
-      } catch (err) {
-        container.innerHTML =
-          "<div style='color:red; padding:10px;'>Ошибка отрисовки списка: " +
-          err.message +
-          "</div>";
-      }
-
-      // Передача данных обратно боту при клике
       document.getElementById("submit-data").addEventListener("click", () => {
-        const selectedItems = [];
+        const selectedItems = new Array();
         document.querySelectorAll(".product-item.selected").forEach((item) => {
-          selectedItems.push(JSON.parse(item.dataset.product));
+          const index = parseInt(item.dataset.idx, 10);
+          selectedItems.push(rawProducts[index]);
         });
 
         if (selectedItems.length === 0) {
